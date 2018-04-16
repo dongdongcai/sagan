@@ -211,7 +211,7 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
     match index with
     | Some i ->
       let newCfp = Array.copy cfp
-      newCfp.[i] <- rp
+      newCfp.[i] <- max rp newCfp.[i]
       newCfp
     | None ->
       let newCfp = Array.zeroCreate (cfp.Length+1)
