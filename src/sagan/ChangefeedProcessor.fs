@@ -239,11 +239,17 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
     let! ret = handle input
     (ret, pp) |> Reactor.send progressReactor
   }
+
+  let initialPosition = 
+    match config.StartingPosition with
+    | Beginning -> [||]
+    | ChangefeedPosition cfp -> cfp
+
   let! progressTracker =
     progressReactor
     |> Reactor.recv
-    |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,[||])
-    |> AsyncSeq.bufferByTimeFold (int config.ProgressInterval.TotalMilliseconds) stateFlatten (None,[||])
+    |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,initialPosition)
+    |> AsyncSeq.bufferByTimeFold (int config.ProgressInterval.TotalMilliseconds) stateFlatten (None,initialPosition)
     |> AsyncSeq.iterAsync reactorProgressHandler
     |> Async.StartChild
 
