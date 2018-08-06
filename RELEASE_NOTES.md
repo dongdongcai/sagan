@@ -1,3 +1,6 @@
+### 0.0.14-alpha
+* Fixed issue for missing partitions in progress handler.
+
 ### 0.0.13-alpha
 * lower FSharp.Core version requirements
 
