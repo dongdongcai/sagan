@@ -266,7 +266,7 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
 
 /// Periodically queries DocDB for the latest positions and timestamp of all partitions in its changefeed.
 /// The `handler` function will be called periodically, once per `interval`, with an updated ChangefeedPosition and timestamp of last document
-let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateTime*(DateTime[]*ChangefeedPosition) -> Async<unit>) = async {
+let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateTime*(DateTime*RangePosition)[] -> Async<unit>) = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
     client = client
@@ -304,7 +304,6 @@ let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateT
       partitions
       |> Array.map getRecentPosition
       |> Async.Parallel
-      |> Async.bind (Array.unzip >> async.Return)
     return (dateTime, changefeedPosition)
   }
 
