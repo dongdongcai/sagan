@@ -239,11 +239,17 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
     let! ret = handle input
     (ret, pp) |> Reactor.send progressReactor
   }
+
+  let initialPosition = 
+    match config.StartingPosition with
+    | Beginning -> [||]
+    | ChangefeedPosition cfp -> cfp
+
   let! progressTracker =
     progressReactor
     |> Reactor.recv
-    |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,[||])
-    |> AsyncSeq.bufferByTimeFold (int config.ProgressInterval.TotalMilliseconds) stateFlatten (None,[||])
+    |> AsyncSeq.scan (accumPartitionsPositions optionMerge) (None,initialPosition)
+    |> AsyncSeq.bufferByTimeFold (int config.ProgressInterval.TotalMilliseconds) stateFlatten (None,initialPosition)
     |> AsyncSeq.iterAsync reactorProgressHandler
     |> Async.StartChild
 
@@ -258,9 +264,9 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
   return! Async.choose progressTracker workers
 }
 
-/// Periodically queries DocDB for the latest positions of all partitions in its changefeed.
-/// The `handler` function will be called periodically, once per `interval`, with an updated ChangefeedPosition.
-let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateTime*ChangefeedPosition -> Async<unit>) = async {
+/// Periodically queries DocDB for the latest positions and timestamp of all partitions in its changefeed.
+/// The `handler` function will be called periodically, once per `interval`, with an updated ChangefeedPosition and timestamp of last document
+let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateTime*(DateTime*RangePosition)[] -> Async<unit>) = async {
   use client = new DocumentClient(cosmos.uri, cosmos.authKey)
   let state = {
     client = client
@@ -276,7 +282,12 @@ let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateT
       RangeMax = pkr.GetPropertyValue "maxExclusive" |> RangePosition.rangeToInt64
       LastLSN = response.ResponseContinuation.Replace("\"", "") |> RangePosition.lsnToInt64
     }
-    return rp
+    let cfoForLastDoc = ChangeFeedOptions(PartitionKeyRangeId = pkr.Id, RequestContinuation = string (rp.LastLSN - 1L))
+    let queryForLastDoc = client.CreateDocumentChangeFeedQuery(state.collectionUri, cfoForLastDoc)
+    let! responseForLastDoc = queryForLastDoc.ExecuteNextAsync<Document>() |> Async.AwaitTask
+    let lastDocument = 
+        Seq.last <| responseForLastDoc.ToArray()
+    return lastDocument.Timestamp, rp
   }
 
   let getRecentPosition pkr =
