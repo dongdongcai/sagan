@@ -1,3 +1,6 @@
+### 0.0.15-alpha
+* Added timestamp for tail tacking
+
 ### 0.0.14-alpha
 * Fixed issue for missing partitions in progress handler.
 
