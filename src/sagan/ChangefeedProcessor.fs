@@ -150,7 +150,7 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
       MaxItemCount = Nullable config.BatchSize,
       StartFromBeginning = true,   // TODO: double check that this is ignored by docdb if RequestContinuation is set
       RequestContinuation = continuationToken)
-  let query = st.client.CreateDocumentChangeFeedQuery(st.collectionUri, cfo)
+  use query = st.client.CreateDocumentChangeFeedQuery(st.collectionUri, cfo)
 
   let rec readPartition (query:Linq.IDocumentQuery<Document>) (pkr:PartitionKeyRange) = asyncSeq {
     let! response = query.ExecuteNextAsync<Document>() |> Async.AwaitTask
@@ -289,7 +289,7 @@ let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateT
 
   let getRecentPosition (pkr:PartitionKeyRange) = async {
     let cfo = ChangeFeedOptions(PartitionKeyRangeId = pkr.Id, StartTime = Nullable (DateTime.Now.AddHours(1.)))
-    let query = client.CreateDocumentChangeFeedQuery(state.collectionUri, cfo)
+    use query = client.CreateDocumentChangeFeedQuery(state.collectionUri, cfo)
     let! response = query.ExecuteNextAsync<Document>() |> Async.AwaitTask
     let rp : RangePosition = {
       RangeMin = pkr.GetPropertyValue "minInclusive" |> RangePosition.rangeToInt64
@@ -297,7 +297,7 @@ let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateT
       LastLSN = response.ResponseContinuation.Replace("\"", "") |> RangePosition.lsnToInt64
     }
     let cfoForLastDoc = ChangeFeedOptions(PartitionKeyRangeId = pkr.Id, RequestContinuation = string (rp.LastLSN - 1L))
-    let queryForLastDoc = client.CreateDocumentChangeFeedQuery(state.collectionUri, cfoForLastDoc)
+    use queryForLastDoc = client.CreateDocumentChangeFeedQuery(state.collectionUri, cfoForLastDoc)
     let! responseForLastDoc = queryForLastDoc.ExecuteNextAsync<Document>() |> Async.AwaitTask
     let lastDocument = 
         Seq.last <| responseForLastDoc.ToArray()
