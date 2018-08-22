@@ -1,3 +1,6 @@
+### 0.0.15
+* Use direct mode for connection policy
+
 ### 0.0.15-alpha
 * Added timestamp for tail tacking
 
