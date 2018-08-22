@@ -189,7 +189,14 @@ let rec private readPartition (config:Config) (st:State) (pkr:PartitionKeyRange)
 /// - `partitionSelector`: is a filtering function `PartitionKeyRange[] -> PartitionKeyRange` that is used to narrow down the list of partitions to process.
 let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelectors.PartitionSelector)
     (handle:Document[]*RangePosition -> Async<'a>) (progressHandler:'a * ChangefeedPosition -> Async<Unit>) (outputMerge:'a*'a -> 'a) = async {
-  use client = new DocumentClient(cosmos.uri, cosmos.authKey)
+  use client = 
+    let connPolicy = 
+        let cp = ConnectionPolicy.Default
+        cp.ConnectionMode <- ConnectionMode.Direct
+        cp.ConnectionProtocol <- Protocol.Tcp
+        cp.MaxConnectionLimit <- 1000
+        cp
+    new DocumentClient(cosmos.uri, cosmos.authKey, connPolicy, Nullable ConsistencyLevel.Session)
   let state = {
     client = client
     collectionUri = UriFactory.CreateDocumentCollectionUri(cosmos.databaseName, cosmos.collectionName)
