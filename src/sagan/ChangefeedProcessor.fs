@@ -274,7 +274,14 @@ let go (cosmos:CosmosEndpoint) (config:Config) (partitionSelector:PartitionSelec
 /// Periodically queries DocDB for the latest positions and timestamp of all partitions in its changefeed.
 /// The `handler` function will be called periodically, once per `interval`, with an updated ChangefeedPosition and timestamp of last document
 let trackTailPosition (cosmos:CosmosEndpoint) (interval:TimeSpan) (handler:DateTime*(DateTime*RangePosition)[] -> Async<unit>) = async {
-  use client = new DocumentClient(cosmos.uri, cosmos.authKey)
+  use client = 
+    let connPolicy = 
+        let cp = ConnectionPolicy.Default
+        cp.ConnectionMode <- ConnectionMode.Direct
+        cp.ConnectionProtocol <- Protocol.Tcp
+        cp.MaxConnectionLimit <- 1000
+        cp
+    new DocumentClient(cosmos.uri, cosmos.authKey, connPolicy, Nullable ConsistencyLevel.Session)
   let state = {
     client = client
     collectionUri = UriFactory.CreateDocumentCollectionUri(cosmos.databaseName, cosmos.collectionName)
